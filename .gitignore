@@ -54,3 +54,4 @@ annotated_output.mp4
 config/.env
 
 annotated_video.mp4
+Weights/OCR.pt
