@@ -1,0 +1,15 @@
+gradio==5.8.0
+matplotlib==3.8.4
+numpy==2.2.0
+opencv_contrib_python==4.10.0.84
+opencv_python==4.9.0.80
+opencv_python_headless==4.10.0.84
+paddleocr==2.9.1
+paddleocr.egg==info
+pandas==2.2.3
+Pillow==11.0.0
+protobuf==5.29.1
+pymongo==4.10.1
+scikit_learn==1.4.2
+scipy==1.14.1
+ultralytics==8.3.15
