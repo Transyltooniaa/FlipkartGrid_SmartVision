@@ -24,7 +24,7 @@ def smooth_box(box_history):
     return np.mean(box_history, axis=0)
 
 def process_video(input_path, output_path):
-    model = YOLO('kitkat_s.pt')
+    model = YOLO('Weights/kitkat_s.pt')
     cap = cv2.VideoCapture(input_path)
 
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
