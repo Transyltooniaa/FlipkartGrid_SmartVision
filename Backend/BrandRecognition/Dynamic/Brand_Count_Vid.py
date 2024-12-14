@@ -3,6 +3,118 @@ import numpy as np
 from collections import deque, defaultdict
 from ultralytics import YOLO
 
+def comprehensive_frame_reduction(
+    input_path, 
+    output_path, 
+    target_frame_count=100, 
+    scene_change_weight=0.5, 
+    motion_weight=0.3, 
+    color_weight=0.2
+):
+    """
+    Comprehensively reduce video frames while maintaining video content representation.
+    
+    Args:
+        input_path (str): Path to input video
+        output_path (str): Path to output video
+        target_frame_count (int): Desired number of frames in reduced video
+        scene_change_weight (float): Weight for scene change importance
+        motion_weight (float): Weight for motion importance
+        color_weight (float): Weight for color distribution importance
+    
+    Returns:
+        List of selected frame indices
+    """
+    # Open the video
+    cap = cv2.VideoCapture(input_path)
+    
+    # Video properties
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    
+    # Output video writer
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    
+    # Preprocessing
+    frames = []
+    frame_grays = []
+    frame_hists = []
+    
+    # Read all frames
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        
+        frames.append(frame)
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        frame_grays.append(gray)
+        
+        # Compute color histogram
+        hist = cv2.calcHist([frame], [0, 1, 2], None, [8, 8, 8], [0, 256, 0, 256, 0, 256])
+        frame_hists.append(hist.flatten())
+    
+    cap.release()
+    
+    # Compute frame importance scores
+    importance_scores = np.zeros(len(frames))
+    
+    # Scene change detection
+    scene_changes = np.zeros(len(frames))
+    for i in range(1, len(frames)):
+        # Compute frame difference
+        frame_diff = cv2.absdiff(frame_grays[i-1], frame_grays[i])
+        scene_changes[i] = np.sum(frame_diff) / (width * height)
+    
+    # Motion estimation (using frame differences)
+    motion_scores = np.zeros(len(frames))
+    for i in range(2, len(frames)):
+        # Compute motion between consecutive frames
+        motion_diff = cv2.absdiff(frame_grays[i-2], frame_grays[i])
+        motion_scores[i] = np.sum(motion_diff) / (width * height)
+    
+    # Color distribution variance
+    color_variance = np.zeros(len(frames))
+    for i in range(len(frames)):
+        # Compute color histogram difference from average
+        color_variance[i] = np.linalg.norm(frame_hists[i] - np.mean(frame_hists, axis=0))
+    
+    # Normalize scores
+    scene_changes = (scene_changes - scene_changes.min()) / (scene_changes.max() - scene_changes.min())
+    motion_scores = (motion_scores - motion_scores.min()) / (motion_scores.max() - motion_scores.min())
+    color_variance = (color_variance - color_variance.min()) / (color_variance.max() - color_variance.min())
+    
+    # Compute importance scores
+    importance_scores = (
+        scene_change_weight * scene_changes +
+        motion_weight * motion_scores +
+        color_weight * color_variance
+    )
+    
+    # Ensure even distribution across video
+    segment_size = len(frames) // target_frame_count
+    selected_frames = []
+    
+    for segment in range(target_frame_count):
+        start = segment * segment_size
+        end = (segment + 1) * segment_size if segment < target_frame_count - 1 else len(frames)
+        
+        # Find the most important frame in this segment
+        segment_scores = importance_scores[start:end]
+        best_frame_idx = np.argmax(segment_scores) + start
+        
+        selected_frames.append(best_frame_idx)
+        
+        # Write selected frames to output video
+        out.write(frames[best_frame_idx])
+    
+    out.release()
+    
+    print(f"Reduced from {total_frames} to {len(selected_frames)} frames")
+    return selected_frames
 
 
 def iou(box1, box2):
@@ -25,8 +137,8 @@ def smooth_box(box_history):
 
 def process_video(input_path, output_path):
     model = YOLO('Weights/kitkat_s.pt')
+    
     cap = cv2.VideoCapture(input_path)
-
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
@@ -126,7 +238,17 @@ def process_video(input_path, output_path):
 
 def annotate_video(input_video):
     output_path = 'annotated_output.mp4'
-    confirmed_items = process_video(input_video, output_path)
+    
+    comprehensive_frame_reduction(
+        input_video,
+        'reduced_video.mp4',
+        target_frame_count=100,  
+        scene_change_weight=0.5,
+        motion_weight=0.3,
+        color_weight=0.2
+    )
+
+    confirmed_items = process_video('reduced_video.mp4', output_path)
 
     item_list = [(brand, quantity) for brand, quantity in confirmed_items.items()]
 
