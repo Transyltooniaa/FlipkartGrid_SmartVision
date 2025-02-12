@@ -15,7 +15,7 @@ pip install -r requirements.txt
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/Transyltooniaa/FlipkartGrid_SmartVision.git
+   git lfs clone https://github.com/Transyltooniaa/FlipkartGrid_SmartVision.git
    cd FlipkartGrid_SmartVision
    ```
 
